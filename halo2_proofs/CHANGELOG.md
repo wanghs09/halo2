@@ -16,6 +16,8 @@ and this project adheres to Rust's notion of
   - `BatchVerifier`, an implementation of `VerificationStrategy` for verifying
     multiple proofs in a batch.
 - `halo2_proofs::dev::FailureLocation` (used in `VerifyFailure::Lookup`)
+- `halo2_proofs::plonk::Constraints` helper, for constructing a gate from a set
+  of constraints with a common selector.
 
 ### Changed
 - `halo2_proofs::plonk::verify_proof` now takes a `VerificationStrategy` instead
