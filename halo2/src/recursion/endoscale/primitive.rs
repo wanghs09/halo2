@@ -6,6 +6,11 @@ use pasta_curves::arithmetic::{CurveAffine, FieldExt};
 use std::collections::{BTreeMap, BTreeSet};
 use std::convert::TryInto;
 
+#[cfg(test)]
+pub(crate) mod fp;
+#[cfg(test)]
+pub(crate) mod fq;
+
 /// Lookup table mapping endoscalars to their corresponding NUM_BITS-bit representations.
 #[allow(dead_code)]
 #[allow(clippy::type_complexity)]
