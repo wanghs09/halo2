@@ -160,7 +160,7 @@ impl<Fixed: FixedPoints<pallas::Affine>> Config<Fixed> {
         mut layouter: impl Layouter<pallas::Base>,
         scalar: AssignedCell<pallas::Base, pallas::Base>,
         base: &<Fixed as FixedPoints<pallas::Affine>>::Base,
-    ) -> Result<EccPoint, Error>
+    ) -> Result<EccPoint<pallas::Affine>, Error>
     where
         <Fixed as FixedPoints<pallas::Affine>>::Base: super::super::FixedPoint<pallas::Affine>,
     {
@@ -177,7 +177,7 @@ impl<Fixed: FixedPoints<pallas::Affine>> Config<Fixed> {
                             .copy_decompose::<{ pallas::Base::NUM_BITS as usize }>(
                                 &mut region,
                                 offset,
-                                scalar.clone(),
+                                &scalar,
                                 true,
                                 NUM_WINDOWS,
                             )?;

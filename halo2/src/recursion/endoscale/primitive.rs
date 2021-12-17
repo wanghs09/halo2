@@ -5,6 +5,7 @@ use pasta_curves::arithmetic::{CurveAffine, FieldExt};
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::convert::TryInto;
+use subtle::CtOption;
 
 #[cfg(test)]
 pub(crate) mod fp;
@@ -68,7 +69,7 @@ pub(crate) fn endoscale_scalar<F: FieldExt, const K: usize>(bits: [bool; K]) -> 
 }
 
 /// Maps a pair of bits to a multiple of a base using endoscaling.
-pub(crate) fn endoscale_pair<C: CurveAffine>(bits: (bool, bool), base: C) -> (C::Base, C::Base) {
+pub(crate) fn endoscale_pair<C: CurveAffine>(bits: (bool, bool), base: C) -> CtOption<C> {
     let mut base = {
         let base = base.coordinates();
         (*base.unwrap().x(), *base.unwrap().y())
@@ -81,7 +82,7 @@ pub(crate) fn endoscale_pair<C: CurveAffine>(bits: (bool, bool), base: C) -> (C:
         base.0 *= C::Base::ZETA;
     }
 
-    base
+    C::from_xy(base.0, base.1)
 }
 
 /// Maps a K-bit bitstring to a multiple of a given base.
@@ -99,8 +100,8 @@ pub(crate) fn endoscale<C: CurveAffine, const K: usize>(
 
     for j in 0..(K / 2) {
         let pair = (bits[2 * j], bits[2 * j + 1]);
-        let (endo_x, endo_y) = endoscale_pair::<C>(pair, base);
-        acc += C::from_xy(endo_x, endo_y).unwrap();
+        let endo = endoscale_pair::<C>(pair, base);
+        acc += endo.unwrap();
     }
 
     let acc = acc.to_affine().coordinates();

@@ -82,7 +82,7 @@ impl<Fixed: FixedPoints<pallas::Affine>> Config<Fixed> {
             .copy_decompose::<L_SCALAR_SHORT>(
                 region,
                 offset,
-                magnitude.clone(),
+                &magnitude,
                 true,
                 NUM_WINDOWS_SHORT,
             )?;
@@ -99,7 +99,7 @@ impl<Fixed: FixedPoints<pallas::Affine>> Config<Fixed> {
         mut layouter: impl Layouter<pallas::Base>,
         magnitude_sign: MagnitudeSign,
         base: &<Fixed as FixedPoints<pallas::Affine>>::ShortScalar,
-    ) -> Result<(EccPoint, EccScalarFixedShort), Error>
+    ) -> Result<(EccPoint<pallas::Affine>, EccScalarFixedShort), Error>
     where
         <Fixed as FixedPoints<pallas::Affine>>::ShortScalar:
             super::super::FixedPoint<pallas::Affine>,

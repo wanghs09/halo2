@@ -77,10 +77,20 @@ impl<const NUM_BITS: usize> Window<NUM_BITS> {
     pub fn value_field<F: PrimeField>(&self) -> F {
         F::from(lebs2ip(&self.0))
     }
+
+    /// Constructs a new `Window`.
+    pub fn new(bits: [bool; NUM_BITS]) -> Self {
+        Self(bits)
+    }
+
+    /// Returns bits contained in this `Window`.
+    pub fn bits(&self) -> [bool; NUM_BITS] {
+        self.0
+    }
 }
 
-impl<F: PrimeField, const NUM_BITS: usize> From<Window<NUM_BITS>> for Assigned<F> {
-    fn from(window: Window<NUM_BITS>) -> Self {
+impl<F: PrimeField, const NUM_BITS: usize> From<&Window<NUM_BITS>> for Assigned<F> {
+    fn from(window: &Window<NUM_BITS>) -> Self {
         Assigned::Trivial(window.value_field())
     }
 }
@@ -110,6 +120,11 @@ impl<F: FieldExt + PrimeFieldBits, const WINDOW_NUM_BITS: usize>
     /// Returns the q_range_check selector of this [`RunningSumConfig`].
     pub(crate) fn q_range_check(&self) -> Selector {
         self.q_range_check
+    }
+
+    /// Returns the `z` advice column
+    pub fn z(&self) -> Column<Advice> {
+        self.z
     }
 
     /// `perm` MUST include the advice column `z`.
@@ -179,7 +194,7 @@ impl<F: FieldExt + PrimeFieldBits, const WINDOW_NUM_BITS: usize>
         &self,
         region: &mut Region<'_, F>,
         offset: usize,
-        alpha: AssignedCell<F, F>,
+        alpha: &AssignedCell<F, F>,
         strict: bool,
         num_windows: usize,
     ) -> Result<RunningSum<F>, Error> {
@@ -349,7 +364,7 @@ mod tests {
                         config.copy_decompose::<WORD_NUM_BITS>(
                             &mut region,
                             offset,
-                            alpha,
+                            &alpha,
                             self.strict,
                             NUM_WINDOWS,
                         )?;

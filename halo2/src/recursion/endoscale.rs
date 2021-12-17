@@ -6,9 +6,10 @@ use halo2_proofs::{
 };
 use pasta_curves::arithmetic::CurveAffine;
 
+mod chip;
 pub mod primitive;
 
-/// Instructions to map bitstrings to and from endoscalars.
+/// Instructions to map bitstring public inputs to and from endoscalars.
 ///
 /// TODO: Replace N = 2^K once we have const evaluable.
 pub trait EndoscaleInstructions<C: CurveAffine, const K: usize, const N: usize>
