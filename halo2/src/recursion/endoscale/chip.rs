@@ -509,3 +509,246 @@ fn pairs<const K: usize>(bits: [bool; K]) -> Vec<(bool, bool)> {
     }
     pairs
 }
+
+#[cfg(test)]
+mod tests {
+    use super::{EndoscaleConfig, EndoscaleInstructions, EndoscaleLookup, TableConfig, Word};
+    use crate::recursion::endoscale::primitive;
+    use halo2_gadgets::utilities::UtilitiesInstructions;
+    use halo2_proofs::{
+        circuit::{Layouter, SimpleFloorPlanner},
+        plonk::{Circuit, ConstraintSystem, Error},
+        poly::commitment::Params,
+    };
+    use pasta_curves::{arithmetic::FieldExt, pallas, vesta};
+
+    use std::marker::PhantomData;
+
+    impl EndoscaleLookup<10, 1024> for pallas::Base {
+        fn table() -> [([bool; 10], Self); 1024] {
+            primitive::fp::TABLE
+        }
+    }
+
+    impl EndoscaleLookup<10, 1024> for vesta::Base {
+        fn table() -> [([bool; 10], Self); 1024] {
+            primitive::fq::TABLE
+        }
+    }
+
+    #[derive(Default)]
+    struct MyCircuit<F: FieldExt>(PhantomData<F>);
+
+    impl Circuit<pallas::Base> for MyCircuit<pallas::Base> {
+        type Config = EndoscaleConfig<pallas::Affine, 10>;
+        type FloorPlanner = SimpleFloorPlanner;
+
+        fn without_witnesses(&self) -> Self {
+            Self::default()
+        }
+
+        fn configure(meta: &mut ConstraintSystem<pallas::Base>) -> Self::Config {
+            let table_config = TableConfig::configure(meta);
+
+            let _ = meta.instance_column();
+            let constants = meta.fixed_column();
+            meta.enable_constant(constants);
+            let endoscalars = meta.instance_column();
+            let endoscalars_copy = meta.advice_column();
+            let word = meta.advice_column();
+            let acc = (meta.advice_column(), meta.advice_column());
+            let point = (meta.advice_column(), meta.advice_column());
+            let base = (meta.advice_column(), meta.advice_column());
+            let bits = (meta.advice_column(), meta.advice_column());
+
+            meta.enable_equality(word);
+
+            EndoscaleConfig::<pallas::Affine, 10>::configure(
+                meta,
+                endoscalars,
+                endoscalars_copy,
+                word,
+                acc,
+                point,
+                base,
+                bits,
+                table_config,
+            )
+        }
+
+        fn synthesize(
+            &self,
+            config: Self::Config,
+            mut layouter: impl Layouter<pallas::Base>,
+        ) -> Result<(), Error> {
+            config.load_endoscale_scalar_table(&mut layouter)?;
+
+            let mut words: Vec<Word<pallas::Base, 10>> = vec![];
+            for row in 0..1024 {
+                let word =
+                    config.get_bitstring(layouter.namespace(|| format!("row {}", row)), row)?;
+                words.push(word);
+            }
+
+            let g_lagrange = Params::<pallas::Affine>::new(11).g_lagrange();
+            let mut acc = None;
+            for idx in 0..20 {
+                acc = Some(config.endoscale_base_fixed(
+                    layouter.namespace(|| format!("commit to {} word", idx)),
+                    g_lagrange[idx],
+                    &words[idx],
+                    acc,
+                )?);
+            }
+
+            // Load a field element.
+            let field_elem = config.load_private(
+                layouter.namespace(|| "load field element"),
+                config.word,
+                Some(pallas::Base::from(1 << 59)),
+            )?;
+            config.endoscale_base_var::<_, 60>(
+                layouter.namespace(|| "commit to field element"),
+                g_lagrange,
+                field_elem,
+                acc,
+            )?;
+
+            Ok(())
+        }
+    }
+
+    impl Circuit<vesta::Base> for MyCircuit<vesta::Base> {
+        type Config = EndoscaleConfig<vesta::Affine, 10>;
+        type FloorPlanner = SimpleFloorPlanner;
+
+        fn without_witnesses(&self) -> Self {
+            Self::default()
+        }
+
+        fn configure(meta: &mut ConstraintSystem<vesta::Base>) -> Self::Config {
+            let table_config = TableConfig::configure(meta);
+
+            let _ = meta.instance_column();
+            let constants = meta.fixed_column();
+            meta.enable_constant(constants);
+            let endoscalars = meta.instance_column();
+            let endoscalars_copy = meta.advice_column();
+            let word = meta.advice_column();
+            let acc = (meta.advice_column(), meta.advice_column());
+            let point = (meta.advice_column(), meta.advice_column());
+            let base = (meta.advice_column(), meta.advice_column());
+            let bits = (meta.advice_column(), meta.advice_column());
+
+            meta.enable_equality(word);
+
+            EndoscaleConfig::<vesta::Affine, 10>::configure(
+                meta,
+                endoscalars,
+                endoscalars_copy,
+                word,
+                acc,
+                point,
+                base,
+                bits,
+                table_config,
+            )
+        }
+
+        fn synthesize(
+            &self,
+            config: Self::Config,
+            mut layouter: impl Layouter<vesta::Base>,
+        ) -> Result<(), Error> {
+            config.load_endoscale_scalar_table(&mut layouter)?;
+
+            // The max no. of 255-bit scalars that can fit into 1024 rows is 39.
+            // Each of these scalars is encoded as 26 endoscalars.
+            // We check 26 * 39 = 1014 endoscalars.
+            let mut words: Vec<Word<vesta::Base, 10>> = vec![];
+            for row in 0..1014 {
+                let word =
+                    config.get_bitstring(layouter.namespace(|| format!("row {}", row)), row)?;
+                words.push(word);
+            }
+
+            let g_lagrange = Params::<vesta::Affine>::new(11).g_lagrange();
+            let mut acc = None;
+            for idx in 0..20 {
+                acc = Some(config.endoscale_base_fixed(
+                    layouter.namespace(|| format!("commit to {} word", idx)),
+                    g_lagrange[idx],
+                    &words[idx],
+                    acc,
+                )?);
+            }
+
+            // Load a field element.
+            let field_elem = config.load_private(
+                layouter.namespace(|| "load field element"),
+                config.word,
+                Some(vesta::Base::from(1 << 59)),
+            )?;
+            config.endoscale_base_var::<_, 60>(
+                layouter.namespace(|| "commit to field element"),
+                g_lagrange,
+                field_elem,
+                acc,
+            )?;
+
+            Ok(())
+        }
+    }
+
+    #[test]
+    fn test_endoscale() {
+        use super::super::primitive::endoscale_scalar_with_padding;
+        use ff::{Field, PrimeField, PrimeFieldBits};
+        use halo2_proofs::dev::MockProver;
+
+        let fp_circuit = MyCircuit::<pallas::Base>(PhantomData);
+        let fq_circuit = MyCircuit::<vesta::Base>(PhantomData);
+
+        let fp_pub_inputs = (0..39)
+            .map(|_| pallas::Base::random(rand::rngs::OsRng))
+            .collect::<Vec<_>>();
+        let fq_pub_inputs = (0..39)
+            .map(|_| vesta::Base::random(rand::rngs::OsRng))
+            .collect::<Vec<_>>();
+
+        let fp_prover = MockProver::run(
+            11,
+            &fp_circuit,
+            vec![
+                fp_pub_inputs.clone(),
+                primitive::fp::TABLE
+                    .iter()
+                    .map(|(_, scalar)| *scalar)
+                    .collect(),
+            ],
+        )
+        .unwrap();
+        assert_eq!(fp_prover.verify(), Ok(()));
+
+        // Encode fp_pub_inputs as public inputs in Fq.
+        let fp_pub_inputs_enc = fp_pub_inputs
+            .iter()
+            .map(|fp_elem| {
+                endoscale_scalar_with_padding::<vesta::Base, 10>(
+                    &fp_elem
+                        .to_le_bits()
+                        .iter()
+                        .by_val()
+                        .take(pallas::Base::NUM_BITS as usize)
+                        .collect::<Vec<_>>(),
+                )
+            })
+            .flatten()
+            .collect::<Vec<_>>();
+
+        // Provide encoded Fp public inputs as endoscalars to the Fq circuit.
+        let fq_prover =
+            MockProver::run(11, &fq_circuit, vec![fq_pub_inputs, fp_pub_inputs_enc]).unwrap();
+        assert_eq!(fq_prover.verify(), Ok(()));
+    }
+}
